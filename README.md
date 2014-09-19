@@ -1,3 +1,7 @@
+Introduction
+============
+
+http://en.wikipedia.org/wiki/Stable_roommates_problem
 
 Installation
 ============
