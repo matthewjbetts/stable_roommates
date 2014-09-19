@@ -1,5 +1,5 @@
 use strict;
-use Test::More tests => 11;
+use Test::More tests => 13;
 
 BEGIN {
     use_ok('Matching::StableRoommates');
@@ -35,10 +35,13 @@ $sr = eval {
                                                    5 => [3, 1, 2, 4, 6],
                                                    6 => [5, 1, 3, 4, 2],
                                                   },
+                                   debug       => 1,
                                   );
 };
 ok($sr, "construct StableRoommates object for example 1");
 ok(($sr->n_preferences(1) == 5), "five preferences for participant 1");
 ok(($sr->n_proposals(1) == 0), "no accepted proposals for participant 1");
+ok(($sr->ranking(1, 3) == 0), "participant 3 is at rank 0 in participant 1's preference list");
+ok(($sr->ranking(4, 6) == 3), "participant 6 is at rank 3 in participant 4's preference list");
 
 $sr->phase1();

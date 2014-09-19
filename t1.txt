@@ -1,0 +1,50 @@
+1..13
+ok 1 - use Matching::StableRoommates;
+ok 2 - don't construct StableRoommates object with n_pairs = 0
+ok 3 - don't construct StableRoommates object with empty preferences
+ok 4 - don't construct StableRoommates object with preferences given as a list
+ok 5 - construct StableRoommates object with integer ids
+ok 6 - no preferences for participant 2
+ok 7 - no accepted proposals for participant 1
+ok 8 - construct StableRoommates object with string ids
+ok 9 - construct StableRoommates object for example 1
+ok 10 - five preferences for participant 1
+ok 11 - no accepted proposals for participant 1
+ok 12 - participant 3 is at rank 0 in participant 1's preference list
+ok 13 - participant 6 is at rank 3 in participant 4's preference list
+1 proposes to 3
+1 proposes to 4
+1 proposes to 2
+1 proposes to 6
+1 proposes to 5
+2 proposes to 6
+2 proposes to 5
+2 proposes to 4
+2 proposes to 1
+2 proposes to 3
+3 proposes to 2
+3 proposes to 4
+3 proposes to 5
+3 proposes to 1
+3 proposes to 6
+4 proposes to 5
+4 proposes to 2
+4 proposes to 3
+4 proposes to 6
+4 proposes to 1
+5 proposes to 3
+5 proposes to 1
+5 proposes to 2
+5 proposes to 4
+5 proposes to 6
+6 proposes to 5
+6 proposes to 1
+6 proposes to 3
+6 proposes to 4
+6 proposes to 2
+1	3
+2	6
+3	2
+4	5
+5	3
+6	5
