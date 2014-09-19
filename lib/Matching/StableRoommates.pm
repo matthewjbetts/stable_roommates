@@ -70,28 +70,58 @@ around preferences => sub {
     }
 };
 
-=head2 _preference_idx
+=head2 preference_idx
 
- usage   : $self->preferences($idA);       # get the current position in the preference list for a particular participant
-           $self->preferences($idA, $idx); # set the current position in the preference list for a particular participant
+ usage   : $self->preference_idx($idA, $idB); # get position of $idB in $idA's preference list
+ function:
+ args    :
+ returns :
+
+=cut
+
+has 'preference_idx' => (is => 'ro', isa => 'HashRef[Any]', required => 1);
+
+around preference_idx => sub {
+    my $orig = shift;
+    my $self = shift;
+    my $idA  = shift;
+    my $idB  = shift;
+
+    if(defined($idA)) {
+        if(defined($idB)) {
+            return $self->preference_idx->{$idA}->{$idB};
+        }
+        else {
+            return $self->preference_idx->{$idA};
+        }
+    }
+    else {
+        return $self->$orig;
+    }
+};
+
+=head2 current_preference_idx
+
+ usage   : $self->current_preference_idx($idA);       # get the current position in the preference list of a particular participant
+           $self->current_preference_idx($idA, $idx); # set the current position in the preference list of a particular participant
  function: get/set the current position in the preference list of a particular participant
  args    :
  returns :
 
 =cut
 
-has '_preference_idx' => (is => 'ro', isa => 'HashRef[Any]', default => sub {return {}}, init_arg => undef);
+has 'current_preference_idx' => (is => 'ro', isa => 'HashRef[Any]', default => sub {return {}}, init_arg => undef);
 
-around _preference_idx => sub {
+around current_preference_idx => sub {
     my $orig = shift;
     my $self = shift;
     my $id   = shift;
     my $idx  = shift;
 
     if(defined($id)) {
-        defined($self->_preference_idx->{$id}) or ($self->_preference_idx->{$id} = -1);
-        defined($idx) and ($self->_preference_idx->{$id} = $idx);
-        return $self->_preference_idx->{$id};
+        defined($self->current_preference_idx->{$id}) or ($self->current_preference_idx->{$id} = -1);
+        defined($idx) and ($self->current_preference_idx->{$id} = $idx);
+        return $self->current_preference_idx->{$id};
     }
     else {
         return $self->$orig;
@@ -205,9 +235,13 @@ around BUILDARGS => sub {
     my $idB;
     my $i;
     my $j;
+    my $k;
     my $key;
     my $value;
     my $preferences;
+    my $preference_idx;
+    my $n_pairs_max;
+    my $n_pairs;
 
     @args = ();
 
@@ -219,15 +253,26 @@ around BUILDARGS => sub {
         if($key eq 'preferences') {
             (ref($value) ne 'HASH') and Carp::croak('preferences should be given as a hash');
             $preferences = $value;
+            $preference_idx = {};
             $participants = {};
             foreach $idA (keys %{$preferences}) {
                 $participants->{$idA}++;
+                $k = 0;
                 foreach $idB (@{$preferences->{$idA}}) {
                     $participants->{$idB}++;
+                    $preference_idx->{$idA}->{$idB} = $k;
+                    ++$k;
                 }
             }
             $participants = [sort keys %{$participants}];
-            push @args, 'participants', $participants;
+            push @args, 'participants', $participants, 'preference_idx', $preference_idx;
+
+            # max number of pairs per participant = number of participants - 1
+            $n_pairs_max = scalar @{$participants} - 1;
+        }
+        elsif($key eq 'n_pairs') {
+            $n_pairs = $value;
+            next;
         }
         elsif($key eq 'participants') {
             next;
@@ -235,6 +280,8 @@ around BUILDARGS => sub {
 
         push @args, $key, $value;
     }
+    (($n_pairs < 1) or ($n_pairs > $n_pairs_max)) and ($n_pairs = $n_pairs_max);
+    push @args, 'n_pairs', $n_pairs;
 
     return $class->$orig(@args);
 };
@@ -262,7 +309,7 @@ sub BUILD {
     }
 }
 
-=head2 _preference_idx_incr
+=head2 current_preference_idx_incr
 
  usage   :
  function:
@@ -271,14 +318,34 @@ sub BUILD {
 
 =cut
 
-sub _preference_idx_incr {
+sub current_preference_idx_incr {
     my($self, $id) = @_;
 
     my $idx;
 
-    $idx = $self->_preference_idx($id, $self->_preference_idx($id) + 1);
+    $idx = $self->current_preference_idx($id, $self->current_preference_idx($id) + 1);
 
     return $idx;
+}
+
+=head2 current_preference_idx_reset
+
+ usage   :
+ function:
+ args    :
+ returns :
+
+=cut
+
+sub current_preference_idx_reset {
+    my($self, $id) = @_;
+
+    my @ids;
+
+    @ids = defined($id) ? ($id) : @{$self->participants};
+    foreach $id (@ids) {
+        $self->current_preference_idx($id, -1);
+    }
 }
 
 =head2 next_preference
@@ -296,7 +363,7 @@ sub next_preference {
     my $idx;
     my $idB;
 
-    $idx = $self->_preference_idx_incr($idA);
+    $idx = $self->current_preference_idx_incr($idA);
     $idB = $self->preferences($idA, $idx);
 
     return $idB;
@@ -400,7 +467,7 @@ sub propose {
     my $idC;
     my $i;
 
-    $self->debug and print("$idA - $idB");
+    $self->debug and print("$idA -> $idB");
 
     $accepted = 0;
     if($self->n_proposals($idB) >= $self->n_pairs) {
@@ -413,22 +480,24 @@ sub propose {
             #$self->debug and print("$idA is at rank $rank0, $idC is at rank $rank1\n");
 
             if($rank1 > $rank0) {
-                # remove $idC from $idB's accepted proposals
+                # - remove $idC from $idB's accepted proposals
+                # - $idC then has to propose to someone else, so put it back on to the queue
                 # FIXME - shouldn't really be manipulating the proposal list directly here
                 splice @{$self->proposals($idB)}, $i, 1;
                 unshift @{$queue}, $idC;
-                $self->debug and print("; $idB x $idC");
+                $self->debug and print("; rem $idB x $idC ($idC < $idA)");
 
-                # FIXME - add $idA to $idB's accepted proposals
+                # add $idA to $idB's accepted proposals
                 $self->accept_proposal($idB, $idA);
                 ++$accepted;
 
                 last;
             }
             else {
-                # idB rejects idA's proposal
+                # - $idB rejects $idA's proposal
+                # - $idA then has to propose to someone else, so put it back on the queue
                 unshift @{$queue}, $idA;
-                $self->debug and print("; $idB x $idA");
+                $self->debug and print("; ign $idB x $idA ($idA < $idC)");
             }
             ++$i;
         }
@@ -474,20 +543,60 @@ sub phase1 {
     my $idA;
     my $idB;
     my $n_accepted;
+    my $firsts;
+    my $lasts;
+    my $prefix;
 
     defined($fh) or ($fh = \*STDOUT);
 
-    $queue = [@{$self->participants}];
+    $self->current_preference_idx_reset();
+    $queue = [(@{$self->participants}) x $self->n_pairs];
     while($idA = shift @{$queue}) {
         $n_accepted = 0;
-        while(defined($idB = $self->next_preference($idA))) {
+        #while(defined($idB = $self->next_preference($idA))) {
+        #    $self->propose($idA, $idB, $queue) and ++$n_accepted;
+        #    ($n_accepted == $self->n_pairs) and last;
+        #}
+
+        if(defined($idB = $self->next_preference($idA))) {
             $self->propose($idA, $idB, $queue) and ++$n_accepted;
-            ($n_accepted == $self->n_pairs) and last;
         }
     }
+    $self->current_preference_idx_reset();
+
+    if($self->debug) {
+        print "\npreferences:\n";
+        foreach $idA (@{$self->participants}) {
+            print join(' ', "$idA:", @{$self->preferences($idA)}), "\n";
+        }
+
+        print "\nproposals:\n";
+        foreach $idA (@{$self->participants}) {
+            print join(' ', $idA, '<-', @{$self->proposals($idA)}), "\n";
+        }
+
+        print "\n";
+    }
+
+    $firsts = {};
+    $lasts = {};
+    foreach $idA (@{$self->participants}) {
+        foreach $idB (@{$self->proposals($idA)}) {
+            $lasts->{$idA} = $idB;
+            $firsts->{$idB} = $idA;
+        }
+    }
+    return 1;
 
     foreach $idA (@{$self->participants}) {
-        print $fh join("\t", $idA, @{$self->proposals($idA)}), "\n";
+        print "$idA:";
+        $prefix = '-';
+        foreach $idB (@{$self->preferences($idA)}) {
+            ($idB eq $firsts->{$idA}) and ($prefix = '+');
+            print "\t$prefix$idB";
+            ($idB eq $lasts->{$idA}) and ($prefix = '-');
+        }
+        print "\n";
     }
 
     return 1;
