@@ -39,9 +39,9 @@ has 'n_pairs' => (is => 'ro', isa => 'Int', required => 1, default => 1);
 
 =head2 preferences
 
- usage   : $self->preferences();           # get the preference lists for all participants as a hash ref
-           $self->preferences($idA);       # get the preferences for a particular participant as a list ref,
-           $self->preferences($idA, $idx); # get the participant at a particular position in a particular participant's as preference list,
+ usage   : $self->preferences();         # get the preference lists for all participants as a hash ref
+           $self->preferences($x);       # get the preferences for a particular participant as a list ref,
+           $self->preferences($x, $idx); # get the participant at a particular position in a particular participant's as preference list,
  function:
  args    : a participant identifier (optional)
  returns : a hash ref, a list or a scalar
@@ -70,9 +70,44 @@ around preferences => sub {
     }
 };
 
+=head2 ignore
+
+ usage   : $self->ignore($x, $y); # find out if $y is ignored in $x's preference list
+           $self->ignore($x, $y, 1); # mark $y as to be ignored in $x's preference list
+ function:
+ args    :
+ returns :
+
+=cut
+
+has 'ignore' => (is => 'ro', isa => 'HashRef[Any]', default => sub {return {}});
+
+around ignore => sub {
+    my $orig  = shift;
+    my $self  = shift;
+    my $x     = shift;
+    my $y     = shift;
+    my $ignore = shift;
+
+    if(defined($x)) {
+        if(defined($y)) {
+            defined($ignore) and ($self->ignore->{$x}->{$y} = $ignore);
+            defined($self->ignore->{$x}->{$y}) or ($self->ignore->{$x}->{$y} = 0);
+            return $self->ignore->{$x}->{$y};
+        }
+        else {
+            return $self->ignore->{$x};
+        }
+    }
+    else {
+        return $self->$orig;
+    }
+};
+
 =head2 preference_idx
 
- usage   : $self->preference_idx($idA, $idB); # get position of $idB in $idA's preference list
+ usage   : $self->preference_idx($x, $y); # get position of $y in $x's preference list
+           $self->preference_idx($x, $y, $idx); # set position of $y in $x's preference list
  function:
  args    :
  returns :
@@ -84,15 +119,17 @@ has 'preference_idx' => (is => 'ro', isa => 'HashRef[Any]', required => 1);
 around preference_idx => sub {
     my $orig = shift;
     my $self = shift;
-    my $idA  = shift;
-    my $idB  = shift;
+    my $x    = shift;
+    my $y    = shift;
+    my $idx  = shift;
 
-    if(defined($idA)) {
-        if(defined($idB)) {
-            return $self->preference_idx->{$idA}->{$idB};
+    if(defined($x)) {
+        if(defined($y)) {
+            defined($idx) and ($self->preference_idx->{$x}->{$y} = $idx);
+            return $self->preference_idx->{$x}->{$y};
         }
         else {
-            return $self->preference_idx->{$idA};
+            return $self->preference_idx->{$x};
         }
     }
     else {
@@ -102,8 +139,8 @@ around preference_idx => sub {
 
 =head2 current_preference_idx
 
- usage   : $self->current_preference_idx($idA);       # get the current position in the preference list of a particular participant
-           $self->current_preference_idx($idA, $idx); # set the current position in the preference list of a particular participant
+ usage   : $self->current_preference_idx($x);       # get the current position in the preference list of a particular participant
+           $self->current_preference_idx($x, $idx); # set the current position in the preference list of a particular participant
  function: get/set the current position in the preference list of a particular participant
  args    :
  returns :
@@ -142,7 +179,7 @@ has 'participants' => (is => 'ro', isa => 'ArrayRef[Any]', required => 1);
 =head2 proposals
 
  usage   : $self->proposals();
-           $self->proposals($idA);
+           $self->proposals($x);
 
  function: get the proposal lists for all participants as a hash ref,
            or the proposals accepted by a particular participant as a list ref
@@ -170,9 +207,9 @@ around proposals => sub {
 =head2 ranking
 
  usage   : $self->ranking;                    # get ranking matrix hash
-           $self->ranking($idA);              # get ranking matrix hash for $idA
-           $self->ranking($idA, $idB);        # get rank of $idB in $idA's preference list
-           $self->ranking($idA, $idB, $rank); # set rank of $idB in $idA's preference list
+           $self->ranking($x);              # get ranking matrix hash for $x
+           $self->ranking($x, $y);        # get rank of $y in $x's preference list
+           $self->ranking($x, $y, $rank); # set rank of $y in $x's preference list
  function:
  args    :
  returns :
@@ -184,25 +221,25 @@ has 'ranking' => (is => 'ro', isa => 'HashRef[Any]', default => sub {return {}},
 around ranking => sub {
     my $orig = shift;
     my $self = shift;
-    my $idA  = shift;
-    my $idB  = shift;
+    my $x  = shift;
+    my $y  = shift;
     my $rank = shift;
 
-    if(defined($idA)){
-        if(defined($idB)) {
+    if(defined($x)){
+        if(defined($y)) {
             if(defined($rank)) {
-                $self->ranking->{$idA}->{$idB} = $rank;
+                $self->ranking->{$x}->{$y} = $rank;
                 return $rank;
             }
             else {
-                # if idB is in idA's preference list, return its rank
+                # if $y is in $x's preference list, return its rank
                 # if not, return the lowest rank possible, i.e. the number of participants
-                $rank = defined($self->ranking->{$idA}->{$idB}) ? $self->ranking->{$idA}->{$idB} : $self->n_participants;
+                $rank = defined($self->ranking->{$x}->{$y}) ? $self->ranking->{$x}->{$y} : $self->n_participants;
                 return $rank;
             }
         }
         else {
-            return $self->ranking->{$idA};
+            return $self->ranking->{$x};
         }
     }
     else {
@@ -231,8 +268,8 @@ around BUILDARGS => sub {
 
     my @args;
     my $participants;
-    my $idA;
-    my $idB;
+    my $x;
+    my $y;
     my $i;
     my $j;
     my $k;
@@ -255,12 +292,12 @@ around BUILDARGS => sub {
             $preferences = $value;
             $preference_idx = {};
             $participants = {};
-            foreach $idA (keys %{$preferences}) {
-                $participants->{$idA}++;
+            foreach $x (keys %{$preferences}) {
+                $participants->{$x}++;
                 $k = 0;
-                foreach $idB (@{$preferences->{$idA}}) {
-                    $participants->{$idB}++;
-                    $preference_idx->{$idA}->{$idB} = $k;
+                foreach $y (@{$preferences->{$x}}) {
+                    $participants->{$y}++;
+                    $preference_idx->{$x}->{$y} = $k;
                     ++$k;
                 }
             }
@@ -289,8 +326,8 @@ around BUILDARGS => sub {
 sub BUILD {
     my($self) = @_;
 
-    my $idA;
-    my $idB;
+    my $x;
+    my $y;
     my $i;
     my $j;
     my $seen;
@@ -299,11 +336,11 @@ sub BUILD {
     (keys(%{$self->preferences}) == 0) and Carp::croak('empty preference list');
 
     # build ranking matrix
-    foreach $idA (@{$self->participants}) {
+    foreach $x (@{$self->participants}) {
         $i = 0;
-        foreach $idB (@{$self->preferences($idA)}) {
-            $self->ranking->{$idA}->{$idB} = $i;
-            $seen->{$idB}++;
+        foreach $y (@{$self->preferences($x)}) {
+            $self->ranking->{$x}->{$y} = $i;
+            $seen->{$y}++;
             ++$i;
         }
     }
@@ -358,15 +395,15 @@ sub current_preference_idx_reset {
 =cut
 
 sub next_preference {
-    my($self, $idA) = @_;
+    my($self, $x) = @_;
 
     my $idx;
-    my $idB;
+    my $y;
 
-    $idx = $self->current_preference_idx_incr($idA);
-    $idB = $self->preferences($idA, $idx);
+    $idx = $self->current_preference_idx_incr($x);
+    $y = $self->preferences($x, $idx);
 
-    return $idB;
+    return $y;
 }
 
 
@@ -448,63 +485,66 @@ sub output_tsv {
 
 =head2 propose
 
- usage   : $self->propose($idA, $idB, $queue);
- function: $idA proposes to $idB
-           $idB accepts the proposal if it has accepted fewer than $self->n_pairs proposals,
+ usage   : $self->propose($x, $y, $queue);
+ function: $x receives a proposal from $y
+           $x accepts the proposal if it has accepted fewer than $self->n_pairs proposals,
            or this proposal is better than an accepted proposal. In that case, the accepted
            proposal with the lowest preference is rejected.
- args    : id of proposer, id of proposee, ref to array of participants waiting to propose
+ args    : id of proposee, id of proposer, ref to array of participants waiting to propose
  returns :
 
 =cut
 
 sub propose {
-    my($self, $idA, $idB, $queue) = @_;
+    my($self, $x, $y, $queue) = @_;
 
     my $accepted;
     my $rank0;
     my $rank1;
-    my $idC;
+    my $z;
     my $i;
+    my $idx;
+    my $a;
 
-    $self->debug and print("$idA -> $idB");
+    $self->debug and print("$y -> $x");
 
     $accepted = 0;
-    if($self->n_proposals($idB) >= $self->n_pairs) {
+    if($self->n_proposals($x) >= $self->n_pairs) {
         # is the new proposal preferred over any of the existing ones?
-        $rank0 = $self->ranking($idB, $idA);
+        $rank0 = $self->ranking($x, $y);
         $i = 0;
-        foreach $idC (@{$self->proposals($idB)}) {
-            $rank1 = $self->ranking($idB, $idC);
+        foreach $z (@{$self->proposals($x)}) {
+            $rank1 = $self->ranking($x, $z);
 
-            #$self->debug and print("$idA is at rank $rank0, $idC is at rank $rank1\n");
+            #$self->debug and print("$y is at rank $rank0, $z is at rank $rank1\n");
 
             if($rank1 > $rank0) {
-                # - remove $idC from $idB's accepted proposals
-                # - $idC then has to propose to someone else, so put it back on to the queue
-                # FIXME - shouldn't really be manipulating the proposal list directly here
-                splice @{$self->proposals($idB)}, $i, 1;
-                unshift @{$queue}, $idC;
-                $self->debug and print("; rem $idB x $idC ($idC < $idA)");
+                # remove $z from $x's accepted proposals
+                splice @{$self->proposals($x)}, $i, 1;
+                $self->debug and print("; rem $x x $z ($z < $y)");
 
-                # add $idA to $idB's accepted proposals
-                $self->accept_proposal($idB, $idA);
+                # $z then has to propose to someone else, so put it back on to the queue
+                unshift @{$queue}, $z;
+
+                # add $y to $x's accepted proposals
+                $self->accept_proposal($x, $y);
                 ++$accepted;
 
                 last;
             }
             else {
-                # - $idB rejects $idA's proposal
-                # - $idA then has to propose to someone else, so put it back on the queue
-                unshift @{$queue}, $idA;
-                $self->debug and print("; ign $idB x $idA ($idA < $idC)");
+                # $x rejects $y's proposal
+                $self->debug and print("; ign $x x $y ($y < $z)");
+
+                # $y then has to propose to someone else, so put it back on the queue
+                unshift @{$queue}, $y;
             }
             ++$i;
         }
     }
     else {
         # accept the proposal
-        $self->accept_proposal($idB, $idA);
+        $self->accept_proposal($x, $y);
         ++$accepted;
     }
     $self->debug and print("\n");
@@ -514,92 +554,270 @@ sub propose {
 
 =head2 accept_proposal
 
- usage   : $self->accept_proposal($idB, $idA);
- function: $idA has proposed to $idB, $idA is added to $idB's list of proposals
+ usage   : $self->accept_proposal($y, $x);
+ function: $x has proposed to $y, $x is added to $y's list of proposals
  args    :
  returns :
 
 =cut
 
 sub accept_proposal {
-    my($self, $idB, $idA) = @_;
+    my($self, $y, $x) = @_;
 
-    push @{$self->proposals($idB)}, $idA;
+    push @{$self->proposals($y)}, $x;
 }
+
+
+=head2 stable
+
+ usage   : $self->stable();
+ function: checks if a stable solution is possible (to be run after $self->phase1())
+ args    :
+ returns : 1 if a stable solution is possible, 0 if not
+
+=cut
+
+sub stable {
+    my($self) = @_;
+
+    my $id;
+
+    foreach $id (@{$self->participants}) {
+        ($self->n_proposals($id) == 0) and return(0);
+    }
+
+    return 0;
+}
+
 
 =head2 phase1
 
- usage   : $self->output($fh);
- function: print the preferences as a tsv
- args    : a file handle glob (defaults to \*STDOUT)
+ usage   : $self->phase1();
+ function: phase 1 of the Irving algorithm
+ args    :
  returns : 1 on success
 
 =cut
 
 sub phase1 {
-    my($self, $fh) = @_;
+    my($self) = @_;
 
     my $queue;
-    my $idA;
-    my $idB;
+    my $y;
+    my $x;
     my $n_accepted;
-    my $firsts;
-    my $lasts;
     my $prefix;
+    my $idx;
+    my %proposals;
+    my $z;
+    my $rank0;
+    my $rank1;
 
-    defined($fh) or ($fh = \*STDOUT);
+    if($self->debug) {
+        print "\npreferences:\n";
+        foreach $y (@{$self->participants}) {
+            print join("\t", "$y:", @{$self->preferences($y)}), "\n";
+        }
+    }
 
     $self->current_preference_idx_reset();
     $queue = [(@{$self->participants}) x $self->n_pairs];
-    while($idA = shift @{$queue}) {
+    while($y = shift @{$queue}) {
         $n_accepted = 0;
-        #while(defined($idB = $self->next_preference($idA))) {
-        #    $self->propose($idA, $idB, $queue) and ++$n_accepted;
+        #while(defined($x = $self->next_preference($y))) {
+        #    $self->propose($y, $x, $queue) and ++$n_accepted;
         #    ($n_accepted == $self->n_pairs) and last;
         #}
 
-        if(defined($idB = $self->next_preference($idA))) {
-            $self->propose($idA, $idB, $queue) and ++$n_accepted;
+        if(defined($x = $self->next_preference($y))) {
+            $self->propose($x, $y, $queue) and ++$n_accepted;
         }
     }
     $self->current_preference_idx_reset();
 
     if($self->debug) {
-        print "\npreferences:\n";
-        foreach $idA (@{$self->participants}) {
-            print join(' ', "$idA:", @{$self->preferences($idA)}), "\n";
-        }
-
         print "\nproposals:\n";
-        foreach $idA (@{$self->participants}) {
-            print join(' ', $idA, '<-', @{$self->proposals($idA)}), "\n";
-        }
-
-        print "\n";
-    }
-
-    $firsts = {};
-    $lasts = {};
-    foreach $idA (@{$self->participants}) {
-        foreach $idB (@{$self->proposals($idA)}) {
-            $lasts->{$idA} = $idB;
-            $firsts->{$idB} = $idA;
+        foreach $y (@{$self->participants}) {
+            print join(' ', $y, '<-', @{$self->proposals($y)}), "\n";
         }
     }
-    return 1;
 
-    foreach $idA (@{$self->participants}) {
-        print "$idA:";
-        $prefix = '-';
-        foreach $idB (@{$self->preferences($idA)}) {
-            ($idB eq $firsts->{$idA}) and ($prefix = '+');
-            print "\t$prefix$idB";
-            ($idB eq $lasts->{$idA}) and ($prefix = '-');
+    # reduce the preference lists
+    foreach $y (@{$self->participants}) {
+        foreach $x (@{$self->proposals($y)}) {
+            # ignore all those in $y's preference list to whom $y prefers $x
+            # i.e. ignore everything after $x from $y's preference list
+            # i.e. $x is last on $y's list
+            for($idx = $self->preference_idx($y, $x) + 1; $idx < @{$self->preferences($y)}; ++$idx) {
+                $self->ignore($y, $self->preferences($y, $idx), 1);
+            }
+
+            # ignore all those in $x's preference list that are before $y
+            # i.e. $y is first on $x's list
+            for($idx = 0; $idx < $self->preference_idx($x, $y); $idx++) {
+                $self->ignore($x, $self->preferences($x, $idx), 2);
+            }
         }
-        print "\n";
+
+        # ignore any remaining preferences which have a better proposal already
+        foreach $x (@{$self->preferences($y)}) {
+            ($self->ignore($y, $x) == 0) or next;
+            $rank0 = $self->ranking($x, $y);
+            foreach $z (@{$self->proposals($x)}) {
+                $rank1 = $self->ranking($x, $z);
+                if($rank1 < $rank0) {
+                    $self->ignore($y, $x, 3);
+                    last;
+                }
+            }
+        }
+    }
+
+    if($self->debug) {
+        print "\nphase1 reduced preferences:\n";
+        foreach $x (@{$self->participants}) {
+            print "$x:";
+            foreach $y (@{$self->preferences($x)}) {
+                print "\t", $y, ($self->ignore($x, $y) == 0) ? '' : join('', '(', $self->ignore($x, $y), ')');
+            }
+            print "\n";
+        }
     }
 
     return 1;
 }
+
+=head2 phase2
+
+ usage   : $self->phase1();
+ function: phase 2 of the Irving algorithm
+ args    :
+ returns : 1 on success
+
+=cut
+
+sub phase2 {
+    my($self) = @_;
+
+    my $p;
+    my $q;
+    my $info;
+    my $ps;
+    my $qs;
+    my $cycle;
+    my $i;
+    my $ps_seen;
+    my $a;
+    my $b;
+    my $b2;
+    my $idx;
+
+    # get the first, second, last and number of preferences on each participant's reduced list
+    $info = {};
+    foreach $p (@{$self->participants}) {
+        $info->{$p} = {
+                       first  => undef,
+                       second => undef,
+                       last   => undef,
+                       n      => 0,
+                      };
+        foreach $q (@{$self->preferences($p)}) {
+            ($self->ignore($p, $q) == 0) or next;
+
+            if(defined($info->{$p}->{first})) {
+                defined($info->{$p}->{second}) or ($info->{$p}->{second} = $q);
+            }
+            else {
+                $info->{$p}->{first} = $q;
+            }
+            $info->{$p}->{last} = $q;
+            $info->{$p}->{n}++;
+        }
+    }
+
+    # find a participant with at least two members on its reduced list
+    $ps = [];
+    foreach $p (@{$self->participants}) {
+        if($info->{$p}->{n} > 1) {
+            push @{$ps}, $p;
+            last;
+        }
+    }
+    (@{$ps} > 0) or last;
+
+    # find a rotation
+    $qs = [];
+    $cycle = undef;
+    $i = 0;
+    $ps_seen = {};
+    while($i < $self->n_participants) {
+        ++$i;
+        $p = $ps->[$#{$ps}];
+        $ps_seen->{$p}++;
+        $q = $info->{$p}->{second};
+        $self->debug and print("ROT p = $p, q = $q\n");
+        $p = $info->{$q}->{last};
+        if(defined($ps_seen->{$p})) {
+            $cycle = $ps;
+            last;
+        }
+        push @{$ps}, $p;
+    }
+    if(!defined($cycle)) {
+        warn "Error: Matching::StableRoommates: no rotation found.";
+        return 0;
+    }
+    $cycle = [@{$cycle}[1..$#{$cycle}]];
+
+    print "cycle = @{$cycle}\n";
+
+    # FIXME - eliminate the rotation
+    foreach $a (@{$cycle}) {
+        $i = 0;
+
+        foreach $b (@{$self->proposals($a)}) {
+            # remove $b from $a's accepted proposals
+            splice @{$self->proposals($a)}, $i, 1;
+
+            # ignore $b in $a's preference list
+            $self->ignore($a, $b, 4);
+            print "IGNORE $a <- $b\n";
+
+            # $a must now propose to the next person on its reduced preference list
+            foreach $b2 (@{$self->preferences($a)}) {
+                ($self->ignore($a, $b2) == 0) or next;
+                $self->accept_proposal($a, $b2);
+                print "ACCEPT $a <- $b2\n";
+
+                # ignore all successors of $a in $b2's reduced preference list,
+                # and ignore $b2 in their lists
+                for($idx = $self->preference_idx($b2, $a) + 1; $idx < @{$self->preferences($b2)}; ++$idx) {
+                    print "PREFREM $b2 ", $self->preferences($b2, $idx), "\n";
+
+                    ($self->ignore($b2, $self->preferences($b2, $idx)) == 0) and $self->ignore($b2, $self->preferences($b2, $idx), 5);
+                    ($self->ignore($self->preferences($b2, $idx), $b2) == 0) and $self->ignore($self->preferences($b2, $idx), $b2, 6);
+                }
+
+                last;
+            }
+            ++$i;
+        }
+    }
+
+    if($self->debug) {
+        print "\nphase2 reduced preferences:\n";
+        foreach $p (@{$self->participants}) {
+            print "$p:";
+            foreach $q (@{$self->preferences($p)}) {
+                print "\t", $q, ($self->ignore($p, $q) == 0) ? '' : join('', '(', $self->ignore($p, $q), ')');
+            }
+            print "\n";
+        }
+    }
+
+    return 1;
+}
+
+
 
 1;

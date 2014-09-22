@@ -1,5 +1,5 @@
 use strict;
-use Test::More tests => 22;
+use Test::More tests => 26;
 
 BEGIN {
     use_ok('Matching::StableRoommates');
@@ -29,6 +29,7 @@ ok(($sr->n_proposals(1) == 0), "no accepted proposals for participant 1");
 $sr = eval {Matching::StableRoommates->new(n_pairs => 1, preferences => {'fred' => ['wilma', 'barney']});};
 ok($sr, "construct StableRoommates object with string ids");
 
+# example from http://en.wikipedia.org/wiki/Stable_roommates_problem
 $preferences = {
                 1 => [3, 4, 2, 6, 5],
                 2 => [6, 5, 4, 1, 3],
@@ -37,16 +38,14 @@ $preferences = {
                 5 => [3, 1, 2, 4, 6],
                 6 => [5, 1, 3, 4, 2],
                };
-
 $n_pairs = 1;
-$sr = eval {
-    Matching::StableRoommates->new(n_pairs => $n_pairs, preferences => $preferences, debug => 1);
-};
+$sr = eval {Matching::StableRoommates->new(n_pairs => $n_pairs, preferences => $preferences);};
 ok($sr, "construct StableRoommates object for example 1");
 ok(($sr->n_preferences(1) == 5), "five preferences for participant 1");
 ok(($sr->n_proposals(1) == 0), "no accepted proposals for participant 1");
 ok(($sr->ranking(1, 3) == 0), "participant 3 is at rank 0 in participant 1's preference list");
 ok(($sr->ranking(4, 6) == 3), "participant 6 is at rank 3 in participant 4's preference list");
+ok($sr->phase1(), 'phase1');
 
 for($n_pairs = 1; $n_pairs < 10; $n_pairs++) {
     $sr = eval {
@@ -61,5 +60,28 @@ for($n_pairs = 1; $n_pairs < 10; $n_pairs++) {
     ok((@wrong == 0), sprintf("wrong number of proposals for %d participant%s%s", $n_wrong, ($n_wrong == 1) ? '' : 's', join(' ', @wrong), ($n_wrong == 0) ? ": @wrong" : ''));
 }
 
-# FIXME - if the n_pairs >= n_pairs_max, then everyone can be paired with everyone else
-# FIXME - need to make sure that at each date round, all pairs are stable
+# Irving's example for which no stable matching is possible
+$preferences = {
+                1 => [2, 3, 4],
+                2 => [3, 1, 4],
+                3 => [1, 2, 4],
+                # 4 has no specified preferences
+               };
+$n_pairs = 1;
+$sr = eval {Matching::StableRoommates->new(n_pairs => $n_pairs, preferences => $preferences);};
+$sr->phase1();
+ok(!$sr->stable, 'no stable matching possible');
+
+# first example in Irving section 2
+$preferences = {
+                1 => [4, 6, 2, 5, 3],
+                2 => [6, 3, 5, 1, 4],
+                3 => [4, 5, 1, 6, 2],
+                4 => [2, 6, 5, 1, 3],
+                5 => [4, 2, 3, 6, 1],
+                6 => [5, 1, 4, 2, 3],
+               };
+$n_pairs = 1;
+$sr = eval {Matching::StableRoommates->new(n_pairs => $n_pairs, preferences => $preferences, debug => 1);};
+ok($sr->phase1(), 'phase1');
+ok($sr->phase2(), 'phase2');
