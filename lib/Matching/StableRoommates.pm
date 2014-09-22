@@ -19,6 +19,7 @@ package Matching::StableRoommates;
 use strict;
 use warnings;
 use Moose;
+use List::Util 'shuffle';
 use vars qw($VERSION);
 
 $VERSION = "0.01a";
@@ -306,6 +307,7 @@ around BUILDARGS => sub {
     my $preference_idx;
     my $n_pairs_max;
     my $n_pairs;
+    my $participants2;
 
     @args = ();
 
@@ -321,15 +323,47 @@ around BUILDARGS => sub {
             $participants = {};
             foreach $x (keys %{$preferences}) {
                 $participants->{$x}++;
-                $k = 0;
                 foreach $y (@{$preferences->{$x}}) {
                     $participants->{$y}++;
+                }
+            }
+
+            # for each participant, get all the other participants it prefers and add those unspecified in random order
+            foreach $x (keys %{$participants}) {
+                # get all the other participants
+                $participants2 = {%{$participants}};
+                $participants2->{$x} = undef;
+                delete $participants2->{$x};
+
+                # remove the ones for which $x has a preference
+                if(defined($preferences->{$x})) {
+                    foreach $y (@{$preferences->{$x}}) {
+                        $participants2->{$y} = undef;
+                        delete $participants2->{$y};
+                    }
+                }
+                else {
+                    $preferences->{$x} = [];
+                }
+
+                # add the remainder to $x's preference list in random order
+                $participants2 = [shuffle(keys %{$participants2})];
+                push @{$preferences->{$x}}, @{$participants2};
+            }
+
+            # index the preferences
+            foreach $x (keys %{$preferences}) {
+                $k = 0;
+                foreach $y (@{$preferences->{$x}}) {
                     $preference_idx->{$x}->{$y} = $k;
                     ++$k;
                 }
             }
+
+            # convert participants to a hash and add to the arguments
             $participants = [sort keys %{$participants}];
             push @args, 'participants', $participants, 'preference_idx', $preference_idx;
+
 
             # max number of pairs per participant = number of participants - 1
             $n_pairs_max = scalar @{$participants} - 1;
@@ -579,23 +613,25 @@ sub propose {
 =head2 stable
 
  usage   : $self->stable();
- function: checks if a stable solution is possible (to be run after $self->phase1())
+ function: checks if a stable solution has been found
  args    :
- returns : 1 if a stable solution is possible, 0 if not
+ returns : 1 if a stable solution has been found, 0 if not
 
 =cut
 
 sub stable {
     my($self) = @_;
 
+    my $info;
     my $p;
 
-    foreach $p (@{$self->participants}) {
+    $info = $self->info();
+    foreach $p (keys %{$info}) {
+        ($info->{$p}->{n} != 1) and return(0);
     }
 
-    return 0;
+    return 1;
 }
-
 
 =head2 phase1
 
@@ -629,7 +665,7 @@ sub phase1 {
     }
 
     $self->current_preference_idx_reset();
-    $queue = [(@{$self->participants}) x $self->n_pairs];
+    $queue = [(@{$self->participants})];
     while($y = shift @{$queue}) {
         $n_accepted = 0;
         #while(defined($x = $self->next_preference($y))) {
@@ -642,6 +678,13 @@ sub phase1 {
         }
     }
     $self->current_preference_idx_reset();
+
+    foreach $x (@{$self->participants}) {
+        if(!defined($self->proposals_to($x))) {
+            #warn "Warning: unstable: $x has no proposals.";
+            return 0;
+        }
+    }
 
     if($self->debug) {
         print "\nproposals:\n";
@@ -723,28 +766,7 @@ sub phase2 {
 
     $cycle_n = 0;
     while(1) {
-        # get the first, second, last and number of preferences on each participant's reduced list
-        $info = {};
-        foreach $p (@{$self->participants}) {
-            $info->{$p} = {
-                           first  => undef,
-                           second => undef,
-                           last   => undef,
-                           n      => 0,
-                          };
-            foreach $q (@{$self->preferences($p)}) {
-                ($self->ignore($p, $q) == 0) or next;
-
-                if(defined($info->{$p}->{first})) {
-                    defined($info->{$p}->{second}) or ($info->{$p}->{second} = $q);
-                }
-                else {
-                    $info->{$p}->{first} = $q;
-                }
-                $info->{$p}->{last} = $q;
-                $info->{$p}->{n}++;
-            }
-        }
+        $info = $self->info();
 
         # find a participant with at least two members on its reduced list
         $ps = [];
@@ -840,7 +862,7 @@ sub phase2 {
 
             print "\nproposals:\n";
             foreach $p (@{$self->participants}) {
-                print join(' ', $p, '<-', $self->proposals_to($p)), "\n";
+                print join(' ', $p, '<-', defined($self->proposals_to($p)) ? $self->proposals_to($p) : 'undef'), "\n";
             }
         }
 
@@ -850,6 +872,37 @@ sub phase2 {
     return 1;
 }
 
+sub info {
+    my($self) = @_;
 
+    my $info;
+    my $p;
+    my $q;
+
+    # get the first, second, last and number of preferences on each participant's reduced list
+    $info = {};
+    foreach $p (@{$self->participants}) {
+        $info->{$p} = {
+                       first  => undef,
+                       second => undef,
+                       last   => undef,
+                       n      => 0,
+                      };
+        foreach $q (@{$self->preferences($p)}) {
+            ($self->ignore($p, $q) == 0) or next;
+
+            if(defined($info->{$p}->{first})) {
+                defined($info->{$p}->{second}) or ($info->{$p}->{second} = $q);
+            }
+            else {
+                $info->{$p}->{first} = $q;
+            }
+            $info->{$p}->{last} = $q;
+            $info->{$p}->{n}++;
+        }
+    }
+
+    return $info;
+}
 
 1;
