@@ -378,7 +378,7 @@ around BUILDARGS => sub {
 
         push @args, $key, $value;
     }
-    (($n_pairs < 1) or ($n_pairs > $n_pairs_max)) and ($n_pairs = $n_pairs_max);
+    defined($n_pairs) and (($n_pairs < 1) or ($n_pairs > $n_pairs_max)) and ($n_pairs = $n_pairs_max);
     push @args, 'n_pairs', $n_pairs;
 
     return $class->$orig(@args);
@@ -531,23 +531,72 @@ sub remove_proposal {
 =head2 output
 
  usage   : $self->output($fh);
- function: print the preferences as a tsv
+ function:
  args    : a file handle glob (defaults to \*STDOUT)
  returns : 1 on success
 
 =cut
 
-sub output_tsv {
+sub output {
     my($self, $fh) = @_;
 
-    my $id;
+    my $x;
+    my $y;
 
     defined($fh) or ($fh = \*STDOUT);
-    foreach $id (@{$self->participants}) {
-        print $fh join("\t", $id, @{$self->preferences($id)}), "\n";
+
+    print $fh "\npreferences:\n";
+    foreach $x (@{$self->participants}) {
+        print $fh join("\t", "$x:", @{$self->preferences($x)}), "\n";
     }
 
+    print $fh "\nreduced preferences:\n";
+    foreach $x (@{$self->participants}) {
+        print $fh "$x:";
+        foreach $y (@{$self->preferences($x)}) {
+            print $fh "\t", $y, ($self->ignore($x, $y) == 0) ? '' : join('', '(', $self->ignore($x, $y), ')');
+        }
+        print $fh "\n";
+    }
+
+    print $fh "\nfinal pairings\n";
+    foreach $x (@{$self->participants}) {
+        print $fh "$x";
+        foreach $y (@{$self->preferences($x)}) {
+            ($self->ignore($x, $y) == 0) and print $fh "\t$y";
+        }
+        print $fh "\n";
+    }
+
+    print $fh "\n";
+
     return 1;
+}
+
+=head2 pairs
+
+ usage   : $pairs = $self->pairs;
+ function:
+ args    : none
+ returns : a hash ref
+
+=cut
+
+sub pairs {
+    my($self) = @_;
+
+    my $pairs;
+    my $x;
+    my $y;
+
+    $pairs = {};
+    foreach $x (@{$self->participants}) {
+        foreach $y (@{$self->preferences($x)}) {
+            $self->ignore($x, $y) or $pairs->{$x}->{$y}++;
+        }
+    }
+
+    return $pairs;
 }
 
 =head2 propose
@@ -807,6 +856,7 @@ sub phase2 {
             return 0;
         }
         $cycle = [@{$cycle}[1..$#{$cycle}]];
+        (@{$cycle} > 0) or return(0);
 
         $self->debug and print("cycle = @{$cycle}\n");
 

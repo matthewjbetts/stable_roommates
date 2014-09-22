@@ -79,20 +79,69 @@ else {
             if($sr->phase2) {
                 #$sr->output();
                 $pairs = $sr->pairs();
-                foreach $x (sort keys %{$pairs}) {
-                    foreach $y (sort keys %{$pairs->{$x}}) {
-                        $pairs_all->{$x}->{$y}++;
-                        print "$x\t$y\n";
-                    }
-                }
+                output_pairs($pairs, $pairs_all);
             }
             else {
-                print "failed phase2\n";
-            }
+                print "failed phase2, pairing randomly instead\n\n";
+
+                $pairs = random_pairing($participants, $pairs_all);
+                output_pairs($pairs, $pairs_all);
+             }
         }
         else {
-            print "failed phase1\n";
+            print "failed phase1, pairing randomly instead\n\n";
+
+            $pairs = random_pairing($participants, $pairs_all);
+            output_pairs($pairs, $pairs_all);
         }
     }
 }
 
+sub output_pairs {
+    my($pairs, $pairs_all) = @_;
+
+    my $x;
+    my $y;
+
+    foreach $x (sort keys %{$pairs}) {
+        foreach $y (sort keys %{$pairs->{$x}}) {
+            $pairs_all->{$x}->{$y}++;
+            print "$x\t$y\n";
+        }
+    }
+}
+
+sub random_pairing {
+    my($participants, $pairs_all) = @_;
+
+    my $pairs;
+    my $n_participants;
+    my $i;
+    my $x;
+    my $y;
+
+    $n_participants = scalar @{$participants};
+    $pairs = {};
+    for($i = 0; $i < $n_participants; $i++) {
+        (scalar(keys(%{$pairs})) >= $n_participants) and last; # pairs are saved in both directions
+        $x = $participants->[$i];
+        defined($pairs->{$x}) and next;
+
+        while(1) {
+            $j = sprintf "%d", rand $n_participants;
+            ($j == $i) and next;
+            $y = $participants->[$j];
+
+            # ignore participants that have already been paired
+            # and ignore pairs found in previous rounds
+
+            if(!defined($pairs->{$y}) and !defined($pairs_all->{$x}->{$y})) {
+                $pairs->{$x}->{$y}++;
+                $pairs->{$y}->{$x}++;
+                last;
+            }
+        }
+    }
+
+    return $pairs;
+}

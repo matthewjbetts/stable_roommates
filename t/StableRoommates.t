@@ -1,5 +1,5 @@
 use strict;
-use Test::More tests => 30;
+use Test::More tests => 32;
 
 BEGIN {
     use_ok('Matching::StableRoommates');
@@ -82,7 +82,7 @@ ok(($sr->proposals_to(4) == 5), '4 <- 5 found');
 ok(($sr->proposals_to(5) == 4), '5 <- 4 found');
 ok(($sr->proposals_to(6) == 1), '6 <- 1 found');
 
-# last example in Irving
+# last example in Irving, which should fail at phase2
 $preferences = {
                 1 => [2, 6, 4, 3, 5],
                 2 => [3, 5, 1, 6, 4],
@@ -96,3 +96,11 @@ $sr = eval {Matching::StableRoommates->new(n_pairs => $n_pairs, preferences => $
 ok($sr->phase1(), 'phase1');
 ok(($sr->phase2() == 0), 'phase2 failed');
 ok(($sr->stable() == 0), 'no stable pairing found');
+
+##########
+$preferences = { 1 => [2, 3] };
+$n_pairs = 1;
+$sr = eval {Matching::StableRoommates->new(n_pairs => $n_pairs, preferences => $preferences);};
+ok(($sr->phase1() == 0), 'phase1 failed');
+ok(($sr->stable() == 0), 'no stable pairing found');
+$sr->output();
