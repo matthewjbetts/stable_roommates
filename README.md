@@ -1,18 +1,29 @@
 # Introduction
 
-A Perl implementation of Irving's algorithm for the stable roommates problem.
+Give a group of people who might want to talk to each other, how would
+you pair them up? We tried this by having initial 'speed dates', where
+people talk to about five random people for about two minutes each,
+and then put those five people in order of who they would most like to
+talk to for longer. We then paired them up, with several rounds of
+pairing, based on those preference lists using Irving's algorithm for
+the stable roommates problem:
 
 * http://en.wikipedia.org/wiki/Stable_roommates_problem
 * http://www.dcs.gla.ac.uk/~pat/jchoco/roommates/papers/Comp_sdarticle.pdf
 
-Unfortunately I haven't made much attempt yet to make it friendly for
-people other than me to use.
+This is implemented here in Perl in a program known as
+'StableRoommmates'. Each person lists all the other people present
+that they would like to talk to, in order of preference. The algorithm
+then attempts a 'stable matching': to pair people up such that there
+is no pair where both members prefer another partner to the one they
+have been paired with. Such a pairing is not always possible.
 
-Each person lists all the other people present that they would like to
-talk to, in order of preference. The algorithm then attempts a 'stable
-matching': to pair people up such that there is no pair where both
-members prefer another partner to the one they have been paired
-with. Such a pairing is not always possible.
+## Caveats / Expectation management
+
+* not everyone will get to speak to their preferred people
+* people can be paired with people not on their preference lists
+* I haven't made much attempt yet to make StableRoommates friendly or
+  easy for other people to use
 
 ## Adaptations to Irving's algorithm implemented in StableRoommmates
 
