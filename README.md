@@ -1,6 +1,6 @@
 # Introduction
 
-Give a group of people who might want to talk to each other, how would
+Given a group of people who might want to talk to each other, how would
 you pair them up? We tried this by having initial 'speed dates', where
 people talk to about five random people for about two minutes each,
 and then put those five people in order of who they would most like to
@@ -27,14 +27,17 @@ have been paired with. Such a pairing is not always possible.
 
 ## Adaptations to Irving's algorithm implemented in StableRoommmates
 
-(I've not attempted a mathematical/computatioanl proof of any of these.)
+(I've not attempted a mathematical/computatioanl proof of any of these,
+unlike the proof of the original algorithm in the original paper.)
 
 ### Incomplete preference lists
 Irving's algorithm assumes that everyone has listed everyone else: if
 you have X people, then everyone should have a prefence list X-1 long.
-So I adapted it to allow for partial preference lists. All people not
-listed by a particular person will be added on to the end of that
-person's given preference list.
+When running an initial speed-dating session in a big unseminar, it's
+unlikely that there'll be time for everyone to speak to everyone else,
+so I adapted the algorithm to allow for partial preference lists: all
+people not listed by a particular person are added on to the end of
+that person's given preference list.
 
 ### Multiple rounds of pairing
 Multiple rounds of pairing are possible, with pairings from previous
