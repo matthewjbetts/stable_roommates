@@ -14,7 +14,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use strict;
-use Test::More tests => 32;
+use Test::More tests => 30;
 
 BEGIN {
     use_ok('Matching::StableRoommates');
@@ -112,10 +112,3 @@ ok($sr->phase1(), 'phase1');
 ok(($sr->phase2() == 0), 'phase2 failed');
 ok(($sr->stable() == 0), 'no stable pairing found');
 
-##########
-$preferences = { 1 => [2, 3] };
-$n_pairs = 1;
-$sr = eval {Matching::StableRoommates->new(n_pairs => $n_pairs, preferences => $preferences);};
-ok(($sr->phase1() == 0), 'phase1 failed');
-ok(($sr->stable() == 0), 'no stable pairing found');
-$sr->output();
